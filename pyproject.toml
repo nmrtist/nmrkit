@@ -1,0 +1,28 @@
+[project]
+name = "nmrkit"
+dynamic = ["version"]
+description = "A lightweight Python package for NMR research."
+authors = [{ name = "Jiekang Tian", email = "jiekangtian@icloud.com" }]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["numpy", "scipy"]
+
+[project.optional-dependencies]
+visualization = ["matplotlib"]
+
+[build-system]
+requires = ["poetry-core>=2.0.0", "poetry-dynamic-versioning>=1.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "pep440"
+format = "{base}"
+metadata = false
+
+[tool.poetry]
+version = "0.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0.0"
