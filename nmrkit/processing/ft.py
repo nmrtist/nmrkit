@@ -10,7 +10,11 @@ from nmrkit.utils import (
 
 
 def fourier_transform(
-    data: NMRData, dim: int = 0, inverse: bool = False, shift: Optional[bool] = None
+    data: NMRData,
+    dim: int = 0,
+    inverse: bool = False,
+    shift: Optional[bool] = None,
+    fft_sign: Optional[int] = None,
 ) -> NMRData:
     """Apply Fourier Transform to a specific dimension of NMR data.
 
@@ -21,6 +25,9 @@ def fourier_transform(
         shift: If True, shift the zero-frequency component to the center.
                If False, do not shift. If None, use shift=True for forward FT
                and shift=False for inverse FT (default: None)
+        fft_sign: Fourier sign convention for forward transforms. Use 1 for
+               np.fft.fftn and -1 for the opposite convention. If None, use
+               the dimension metadata value "fft_sign", defaulting to 1.
 
     Returns:
         NMRData: New NMRData object with FT applied
@@ -30,6 +37,7 @@ def fourier_transform(
 
     # Validate parameters
     validate_param_type("shift", shift, (bool, type(None)))
+    validate_param_type("fft_sign", fft_sign, (int, type(None)))
 
     # Create a copy to avoid modifying original data
     result = data.copy()
@@ -38,6 +46,12 @@ def fourier_transform(
     if not result.dimensions[dim].can_ft:
         raise ValueError(f"Dimension {dim} is not Fourier transform capable")
 
+    if fft_sign is None:
+        fft_sign = int(result.dimensions[dim].domain_metadata.get("fft_sign", 1))
+
+    if fft_sign not in {1, -1}:
+        raise ValueError(f"fft_sign must be 1 or -1, got {fft_sign}")
+
     # Determine domain type after transformation
     if inverse:
         new_domain = "time"
@@ -45,11 +59,15 @@ def fourier_transform(
         scale_factor = result.dimensions[dim].size
     else:
         new_domain = "frequency"
-        fft_func = np.fft.fftn
+        fft_func = np.fft.fftn if fft_sign == 1 else np.fft.ifftn
         scale_factor = 1.0
 
     # Apply Fourier Transform
     result.data = fft_func(result.data, axes=(dim,)) / scale_factor
+    if not inverse and fft_sign == -1:
+        # np.fft.ifftn includes 1/N normalization. Match forward FFT scaling
+        # when it is used only to select the opposite sign convention.
+        result.data = result.data * result.dimensions[dim].size
 
     # Determine shift behavior if not explicitly specified
     if shift is None:
@@ -105,33 +123,14 @@ def fourier_transform(
         can_ft=True,  # Both time and frequency domains should be FT capable
     )
 
-    # For indirect dimensions (dim != 0), extract the second half of the spectrum
-    # This is because indirect dimensions often produce symmetric spectra
-    if dim != 0 and not inverse:
-        # Calculate the half size
-        half_size = result.data.shape[dim] // 2
-
-        # Create slice objects for all dimensions
-        slices = [slice(None)] * result.data.ndim
-        slices[dim] = slice(half_size, None)
-
-        # Apply the slice to extract the second half
-        result.data = result.data[tuple(slices)]
-
-        # Update the dimension size
-        result.dimensions[dim].size = result.data.shape[dim]
-
-        # Update the axis generator for the new size
-        if isinstance(result.dimensions[dim].axis_generator, LinearGenerator):
-            old_generator = result.dimensions[dim].axis_generator
-            new_start = old_generator.start + old_generator.step * half_size
-            result.dimensions[dim].axis_generator = LinearGenerator(
-                start=new_start, step=old_generator.step
-            )
-
     # Update domain metadata
     update_domain_metadata(
-        result, dim, ft_applied=True, ft_inverse=inverse, ft_shifted=shift
+        result,
+        dim,
+        ft_applied=True,
+        ft_inverse=inverse,
+        ft_shifted=shift,
+        fft_sign=fft_sign,
     )
 
     return result

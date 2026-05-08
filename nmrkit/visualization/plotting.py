@@ -92,8 +92,9 @@ def _plot_2d(data: NMRData, output_path: Optional[str] = None, plt=None):
     dim1 = data.dimensions[0]  # First dimension (now x-axis)
     dim2 = data.dimensions[1]  # Second dimension (now y-axis)
 
-    # Get real part of the data
-    signal = data.data.real
+    # Matplotlib contour expects z rows to match y and columns to match x.
+    # NMRData stores dimensions as (F2, F1), so transpose for x=F2, y=F1.
+    signal = data.data.real.T
 
     # Generate axes
     x = dim1.generate_axis()  # First dimension (x-axis)
@@ -110,14 +111,14 @@ def _plot_2d(data: NMRData, output_path: Optional[str] = None, plt=None):
         # Update unit to ppm after conversion
         dim1.unit = "ppm"
         x = np.flip(x)
-        signal = np.flip(signal, axis=0)
+        signal = np.flip(signal, axis=1)
 
     if is_frequency_domain_f2 and dim2.observation_frequency:
         y = y / dim2.observation_frequency
         # Update unit to ppm after conversion
         dim2.unit = "ppm"
         y = np.flip(y)
-        signal = np.flip(signal, axis=1)
+        signal = np.flip(signal, axis=0)
 
     # Create figure
     plt.figure(figsize=(11.69, 8.27))

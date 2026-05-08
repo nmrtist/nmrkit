@@ -103,6 +103,54 @@ def test_fourier_transform_axis_generator_update():
     assert result.dimensions[0].axis_generator.step == expected_step
 
 
+def test_fourier_transform_indirect_dimension_keeps_full_spectrum():
+    data_array = np.random.rand(16, 32) + 1j * np.random.rand(16, 32)
+    dims = [
+        DimensionInfo(
+            size=16,
+            is_complex=True,
+            domain_type="frequency",
+            can_ft=False,
+        ),
+        DimensionInfo(
+            size=32,
+            is_complex=True,
+            domain_type="time",
+            can_ft=True,
+            axis_generator=LinearGenerator(start=0.0, step=0.001),
+        ),
+    ]
+    nmr_data = NMRData(data=data_array, dimensions=dims)
+
+    result = fourier_transform(nmr_data, dim=1, shift=True)
+
+    assert result.shape == (16, 32)
+    assert result.dimensions[1].size == 32
+    assert result.dimensions[1].domain_type == "frequency"
+
+
+def test_fourier_transform_uses_metadata_fft_sign():
+    size = 16
+    data_array = np.random.rand(size) + 1j * np.random.rand(size)
+    dims = [
+        DimensionInfo(
+            size=size,
+            is_complex=True,
+            domain_type="time",
+            can_ft=True,
+            axis_generator=LinearGenerator(start=0.0, step=0.001),
+            domain_metadata={"fft_sign": -1},
+        )
+    ]
+    nmr_data = NMRData(data=data_array, dimensions=dims)
+
+    result = fourier_transform(nmr_data, dim=0, shift=True)
+    expected = np.fft.fftshift(np.fft.ifftn(data_array, axes=(0,)) * size)
+
+    np.testing.assert_allclose(result.data, expected)
+    assert result.dimensions[0].domain_metadata["fft_sign"] == -1
+
+
 def test_ft_shift_functions():
     # Test ft_shift and ft_unshift functions
     nmr_data = create_test_1d_data(

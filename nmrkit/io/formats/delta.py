@@ -100,12 +100,14 @@ class DeltaReader(FormatReader):
         # Unit information for each dimension
         self._unit_types = [self.SIUNIT_NONE] * 8  # Unit type codes
         self._unit_exps = [0] * 8  # Unit exponents
+        self._data = None
 
     def read(self) -> NMRData:
         with open(self.filename, "rb") as self._file:
             self._parse_header()
             self._params = self._parse_params()
             data = self._read_data()
+            self._data = data
             dimensions = self._create_dimensions()
             metadata = self._create_metadata()
 
@@ -399,7 +401,10 @@ class DeltaReader(FormatReader):
 
         # Create dimension objects for each dimension
         for i in range(self._dim_count):
-            size = self._dim_sizes[i]
+            logical_size = self._dim_sizes[i]
+            size = logical_size
+            if self._data is not None and i < self._data.ndim:
+                size = self._data.shape[i]
             start = self._axis_start[i]
             stop = self._axis_stop[i]
             dim_type = self._dim_types[i]
@@ -453,7 +458,11 @@ class DeltaReader(FormatReader):
                 # Time domain: spectral width is inverse of time increment
                 # This is the standard way to calculate spectral width in NMR
                 total_time = stop - start
-                spectral_width = size / total_time if total_time != 0 else 0.0
+                spectral_width = (
+                    logical_size / total_time
+                    if total_time != 0 and logical_size > 0
+                    else 0.0
+                )
             else:
                 # Frequency domain: use the axis difference directly
                 spectral_width = abs(stop - start)
@@ -469,7 +478,17 @@ class DeltaReader(FormatReader):
                 offset = start
 
             # Calculate step size for linear axis
-            step = (stop - start) / size if size > 0 else 0.0
+            step = (stop - start) / logical_size if logical_size > 0 else 0.0
+
+            domain_metadata = {
+                "name": dim_name,
+                "dimension_type": dim_type,
+                "logical_size": logical_size,
+                "storage_size": size,
+            }
+            if is_complex and size == 2 * logical_size and i > 0:
+                domain_metadata["complex_pair_encoding"] = "separated"
+                domain_metadata["first_component"] = "real"
 
             dim_info = DimensionInfo(
                 size=size,
@@ -483,7 +502,7 @@ class DeltaReader(FormatReader):
                 axis_generator=LinearGenerator(start=start, step=step),
                 domain_type="time" if is_time_domain else "frequency",
                 can_ft=is_time_domain,  # Can perform FT on time domain data
-                domain_metadata={"name": dim_name, "dimension_type": dim_type},
+                domain_metadata=domain_metadata,
             )
 
             dimensions.append(dim_info)

@@ -34,6 +34,16 @@ class TopSpinReader(FormatReader):
         1: "big",  # BYTORDA=1: big-endian
     }
 
+    FNMODE_NAMES = {
+        0: "undefined",
+        1: "qf",
+        2: "qseq",
+        3: "tppi",
+        4: "states",
+        5: "states-tppi",
+        6: "echo-antiecho",
+    }
+
     def __init__(self, filename: str, options: Optional[Dict] = None):
         """Initialize the TopSpin reader.
 
@@ -64,6 +74,27 @@ class TopSpinReader(FormatReader):
         self._parameters = {}
         self._dimensions = []
         self._data = None
+
+    def _indirect_dimension_metadata(
+        self, name: str, indirect_params: Dict[str, any]
+    ) -> Dict[str, any]:
+        """Build storage metadata for a Bruker indirect dimension."""
+        metadata = {"name": name}
+        fnmode = indirect_params.get("FnMODE")
+
+        if isinstance(fnmode, (int, float)):
+            fnmode = int(fnmode)
+            metadata["fnmode"] = fnmode
+            metadata["fnmode_name"] = self.FNMODE_NAMES.get(fnmode, "unknown")
+
+            if fnmode == 1:
+                metadata["complex_pair_encoding"] = "none"
+                metadata["fft_sign"] = -1
+            elif fnmode in {2, 4, 5, 6}:
+                metadata["complex_pair_encoding"] = "interleaved"
+                metadata["first_component"] = "real"
+
+        return metadata
 
     def read(self) -> NMRData:
         """Read Bruker TopSpin data and return an NMRData object.
@@ -371,7 +402,9 @@ class TopSpinReader(FormatReader):
                 axis_generator=LinearGenerator(
                     step=1.0 / (spectral_width if spectral_width > 0.0 else 1.0)
                 ),
-                domain_metadata={"name": "F1"},
+                domain_metadata=self._indirect_dimension_metadata(
+                    "F1", indirect_params
+                ),
             )
             dimensions.append(dim)
         else:
@@ -460,7 +493,9 @@ class TopSpinReader(FormatReader):
                     axis_generator=LinearGenerator(
                         step=1.0 / (spectral_width if spectral_width > 0.0 else 1.0)
                     ),
-                    domain_metadata={"name": f"F{i - 1}"},
+                    domain_metadata=self._indirect_dimension_metadata(
+                        f"F{i - 1}", indirect_params
+                    ),
                 )
                 dimensions.append(dim)
 
