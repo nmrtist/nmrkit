@@ -13,6 +13,7 @@ This is an early-stage project under active development. Contributions are welco
 
 - **Data Import/Export**: Support for common NMR formats including TopSpin and Delta
 - **Basic Processing**: Fourier transform, apodization (exponential multiplication), zero filling, phase correction
+- **Acquisition Planning**: Calculate DOSY diffusion experiment timing and gradient settings
 - **Visualization**: Interactive plotting with customizable parameters
 - **Simple API**: Intuitive functions for data processing workflows
 
@@ -80,6 +81,23 @@ data = nk.phase(data, ph0=10.0, ph1=25.0)
 
 # Plot the manually processed spectrum
 nk.plot(data)
+```
+
+### DOSY Acquisition Planning
+
+Use acquisition helpers to estimate DOSY experiment settings from a diffusion
+coefficient and the maximum gradient strength of an instrument:
+
+```python
+dosy_params = nk.calculate_dosy_settings(
+    diffusion_coefficient_m2_s=5.8e-10,
+    max_gradient_t_m=0.535,
+    target_attenuation=0.05,
+)
+
+print(f"Diffusion time (big delta):   {dosy_params.diffusion_time_ms:.2f} ms")
+print(f"Gradient duration (little delta): {dosy_params.gradient_duration_ms:.4f} ms")
+print(f"Achieved residual signal:     {dosy_params.achieved_attenuation:.4f}")
 ```
 
 ## License

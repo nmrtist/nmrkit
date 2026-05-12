@@ -35,6 +35,15 @@ from .processing import (
     baseline_correct,
 )
 
+# Acquisition planning functions
+from .acquisition import (
+    DOSYSettings,
+    attenuation_factor,
+    calculate_dosy_settings,
+    diffusion_weighting,
+    gamma_for_nucleus,
+)
+
 # Complex conversion functions
 from .utils.complex import complexify, decomplexify
 
@@ -65,6 +74,7 @@ bc = baseline_correct
 
 # Complex processing
 complexify_indirect = complexify_indirect_dim
+dosy_settings = calculate_dosy_settings
 
 
 # Auto processing workflow
@@ -148,8 +158,14 @@ __all__ = [
     "phase",
     "autophase",
     "baseline_correct",
+    "DOSYSettings",
+    "attenuation_factor",
+    "calculate_dosy_settings",
+    "diffusion_weighting",
+    "gamma_for_nucleus",
     "bc",
     "complexify_indirect",
+    "dosy_settings",
     # Workflow functions
     "process_1d",
     "process_2d",
